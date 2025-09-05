@@ -1,83 +1,62 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>تلخيص YouTube & مقالات — MVP</title>
+  <meta charset="UTF-8">
+  <title>أداة تلخيص AI</title>
   <style>
-    body { font-family: system-ui, Arial; max-width:900px; margin:20px auto; padding:10px; }
-    input, textarea, select, button { width:100%; padding:8px; margin-top:8px; box-sizing:border-box; }
-    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    pre { background:#f4f4f4; padding:12px; white-space:pre-wrap; }
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; }
+    textarea, input, select, button {
+      width: 100%; padding: 10px; margin: 10px 0; font-size: 16px;
+    }
+    #result { margin-top: 20px; padding: 15px; background: #f4f4f4; border-radius: 8px; }
   </style>
 </head>
 <body>
-  <h1>تلخيص YouTube + مقالات — MVP</h1>
+  <h2>✂️ أداة تلخيص YouTube والمقالات والنصوص</h2>
 
-  <label>اختر النوع:</label>
+  <label>اختر الوضع:</label>
   <select id="mode">
-    <option value="youtube">YouTube (رابط الفيديو)</option>
-    <option value="article">مقال (رابط)</option>
+    <option value="youtube">يوتيوب</option>
+    <option value="article">مقال</option>
     <option value="text">نص مباشر</option>
   </select>
 
-  <div id="urlDiv">
-    <label>ضع الرابط هنا:</label>
-    <input id="url" placeholder="https://..." />
-  </div>
+  <label>الرابط أو النص:</label>
+  <textarea id="input" rows="5" placeholder="ضع رابط يوتيوب، رابط مقال أو نص..."></textarea>
 
-  <div id="textDiv" style="display:none;">
-    <label>أدخل النص:</label>
-    <textarea id="text" rows="8" placeholder="أو ألصق النص هنا"></textarea>
-  </div>
+  <button onclick="summarize()">تلخيص</button>
 
-  <button id="summarizeBtn">تلخيص</button>
-
-  <h3>الملخص:</h3>
-  <pre id="result">اضغط "تلخيص" لبدء العملية.</pre>
+  <div id="result"></div>
 
   <script>
-    const modeEl = document.getElementById('mode');
-    const urlDiv = document.getElementById('urlDiv');
-    const textDiv = document.getElementById('textDiv');
-    const urlEl = document.getElementById('url');
-    const textEl = document.getElementById('text');
-    const btn = document.getElementById('summarizeBtn');
-    const resultEl = document.getElementById('result');
-
-    modeEl.addEventListener('change', () => {
-      const m = modeEl.value;
-      if (m === 'text') {
-        urlDiv.style.display = 'none';
-        textDiv.style.display = 'block';
-      } else {
-        urlDiv.style.display = 'block';
-        textDiv.style.display = 'none';
+    async function summarize() {
+      const mode = document.getElementById("mode").value;
+      const input = document.getElementById("input").value.trim();
+      if (!input) {
+        alert("رجاءً ضع رابط أو نص");
+        return;
       }
-    });
 
-    btn.addEventListener('click', async () => {
-      resultEl.textContent = "جارٍ المعالجة...";
-      const mode = modeEl.value;
-      const payload = { mode, url: urlEl.value, text: textEl.value };
+      const body = mode === "text" ? { mode, text: input } : { mode, url: input };
+
+      document.getElementById("result").innerHTML = "⏳ جاري التلخيص...";
 
       try {
-        const resp = await fetch('/api/summarize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+        const res = await fetch("/api/summarize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
         });
-        if (!resp.ok) {
-          const err = await resp.json();
-          resultEl.textContent = "خطأ: " + (err.error || JSON.stringify(err));
-          return;
+        const data = await res.json();
+        if (data.summary) {
+          document.getElementById("result").innerHTML = "<b>📌 الملخص:</b><br>" + data.summary;
+        } else {
+          document.getElementById("result").innerHTML = "❌ خطأ: " + (data.error || "غير معروف");
         }
-        const data = await resp.json();
-        resultEl.textContent = data.summary || "لا يوجد ملخص.";
-      } catch (e) {
-        resultEl.textContent = "خطأ في الاتصال: " + e.message;
+      } catch (err) {
+        document.getElementById("result").innerHTML = "⚠️ فشل الاتصال بالسيرفر";
       }
-    });
+    }
   </script>
 </body>
 </html>
