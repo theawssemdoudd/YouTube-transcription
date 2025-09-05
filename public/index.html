@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>تلخيص YouTube & مقالات — MVP</title>
+  <style>
+    body { font-family: system-ui, Arial; max-width:900px; margin:20px auto; padding:10px; }
+    input, textarea, select, button { width:100%; padding:8px; margin-top:8px; box-sizing:border-box; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    pre { background:#f4f4f4; padding:12px; white-space:pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>تلخيص YouTube + مقالات — MVP</h1>
+
+  <label>اختر النوع:</label>
+  <select id="mode">
+    <option value="youtube">YouTube (رابط الفيديو)</option>
+    <option value="article">مقال (رابط)</option>
+    <option value="text">نص مباشر</option>
+  </select>
+
+  <div id="urlDiv">
+    <label>ضع الرابط هنا:</label>
+    <input id="url" placeholder="https://..." />
+  </div>
+
+  <div id="textDiv" style="display:none;">
+    <label>أدخل النص:</label>
+    <textarea id="text" rows="8" placeholder="أو ألصق النص هنا"></textarea>
+  </div>
+
+  <button id="summarizeBtn">تلخيص</button>
+
+  <h3>الملخص:</h3>
+  <pre id="result">اضغط "تلخيص" لبدء العملية.</pre>
+
+  <script>
+    const modeEl = document.getElementById('mode');
+    const urlDiv = document.getElementById('urlDiv');
+    const textDiv = document.getElementById('textDiv');
+    const urlEl = document.getElementById('url');
+    const textEl = document.getElementById('text');
+    const btn = document.getElementById('summarizeBtn');
+    const resultEl = document.getElementById('result');
+
+    modeEl.addEventListener('change', () => {
+      const m = modeEl.value;
+      if (m === 'text') {
+        urlDiv.style.display = 'none';
+        textDiv.style.display = 'block';
+      } else {
+        urlDiv.style.display = 'block';
+        textDiv.style.display = 'none';
+      }
+    });
+
+    btn.addEventListener('click', async () => {
+      resultEl.textContent = "جارٍ المعالجة...";
+      const mode = modeEl.value;
+      const payload = { mode, url: urlEl.value, text: textEl.value };
+
+      try {
+        const resp = await fetch('/api/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          resultEl.textContent = "خطأ: " + (err.error || JSON.stringify(err));
+          return;
+        }
+        const data = await resp.json();
+        resultEl.textContent = data.summary || "لا يوجد ملخص.";
+      } catch (e) {
+        resultEl.textContent = "خطأ في الاتصال: " + e.message;
+      }
+    });
+  </script>
+</body>
+</html>
