@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import axios from "axios";
 import cors from "cors";
@@ -12,8 +11,9 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const HF_TOKEN = process.env.HF_TOKEN;
+
 if (!HF_TOKEN) {
-  console.warn("⚠️ ضع HF_TOKEN في متغيرات البيئة.");
+  console.error("❌ مفقود HF_TOKEN! أضف متغير بيئة في Vercel باسم HF_TOKEN");
 }
 
 function extractYouTubeId(url) {
@@ -22,32 +22,39 @@ function extractYouTubeId(url) {
     if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
     if (u.searchParams.has("v")) return u.searchParams.get("v");
     return null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
 async function summarizeWithHF(text) {
-  const model = "facebook/bart-large-cnn"; // ممكن تغييره لـ pegasus-xsum أو t5-base
+  if (!HF_TOKEN) {
+    throw new Error("لم يتم إعداد HF_TOKEN في متغيرات البيئة.");
+  }
+
+  const model = "facebook/bart-large-cnn";
   const resp = await axios.post(
     `https://api-inference.huggingface.co/models/${model}`,
     { inputs: text },
     {
       headers: {
         Authorization: `Bearer ${HF_TOKEN}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      timeout: 60000
+      timeout: 60000,
     }
   );
 
   const data = resp.data;
+
+  // معالجة الأخطاء القادمة من API
   if (Array.isArray(data) && data[0]?.summary_text) {
     return data[0].summary_text;
   }
   if (data.error) {
-    throw new Error(data.error);
+    throw new Error(`HF API Error: ${data.error}`);
   }
+
   return JSON.stringify(data);
 }
 
@@ -60,7 +67,7 @@ app.post("/api/summarize", async (req, res) => {
       const videoId = extractYouTubeId(url);
       if (!videoId) return res.status(400).json({ error: "رابط يوتيوب غير صالح" });
       const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-      contentText = transcript.map(s => s.text).join(" ");
+      contentText = transcript.map((s) => s.text).join(" ");
     } else if (mode === "article") {
       const resp = await axios.get(url);
       const dom = new JSDOM(resp.data, { url });
@@ -77,8 +84,8 @@ app.post("/api/summarize", async (req, res) => {
       return res.status(400).json({ error: "لم يتم استخراج أي نص للتلخيص" });
     }
 
-    // تقليم النص إذا طويل جدًا
-    const MAX_CHARS = 3000;
+    // ✂️ قص النص لتفادي مشاكل الموديل
+    const MAX_CHARS = 1500;
     if (contentText.length > MAX_CHARS) {
       contentText = contentText.slice(0, MAX_CHARS);
     }
@@ -86,10 +93,20 @@ app.post("/api/summarize", async (req, res) => {
     const summary = await summarizeWithHF(contentText);
     res.json({ summary });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "خطأ في الخادم", details: err.message });
+    console.error("❌ Summarize error:", err.message);
+    res.status(500).json({
+      error: "خطأ في الخادم",
+      details: err.message,
+    });
   }
 });
 
+// إصلاح مشكلة Cannot GET /
+app.get("/", (req, res) => {
+  res.sendFile("index.html", { root: "public" });
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ الخادم يعمل على http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`✅ الخادم يعمل على http://localhost:${PORT}`)
+);
