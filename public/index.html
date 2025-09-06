@@ -1,62 +1,53 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>أداة تلخيص AI</title>
+  <meta charset="UTF-8" />
+  <title>Transcript Extractor</title>
   <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; }
-    textarea, input, select, button {
-      width: 100%; padding: 10px; margin: 10px 0; font-size: 16px;
-    }
-    #result { margin-top: 20px; padding: 15px; background: #f4f4f4; border-radius: 8px; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea, input { width: 100%; margin: 8px 0; }
+    button { padding: 10px 15px; }
+    pre { background: #f4f4f4; padding: 10px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h2>✂️ أداة تلخيص YouTube والمقالات والنصوص</h2>
-
-  <label>اختر الوضع:</label>
-  <select id="mode">
-    <option value="youtube">يوتيوب</option>
-    <option value="article">مقال</option>
-    <option value="text">نص مباشر</option>
-  </select>
-
-  <label>الرابط أو النص:</label>
-  <textarea id="input" rows="5" placeholder="ضع رابط يوتيوب، رابط مقال أو نص..."></textarea>
-
-  <button onclick="summarize()">تلخيص</button>
-
-  <div id="result"></div>
+  <h1>Transcript Extractor</h1>
+  <form id="form">
+    <label>Mode:</label>
+    <select id="mode">
+      <option value="youtube">YouTube</option>
+      <option value="article">Article</option>
+      <option value="text">Text</option>
+    </select>
+    <br />
+    <label>URL or Text:</label>
+    <textarea id="input" rows="4"></textarea>
+    <br />
+    <button type="submit">Extract</button>
+  </form>
+  <h2>Result:</h2>
+  <pre id="result"></pre>
 
   <script>
-    async function summarize() {
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
       const mode = document.getElementById("mode").value;
-      const input = document.getElementById("input").value.trim();
-      if (!input) {
-        alert("رجاءً ضع رابط أو نص");
-        return;
-      }
+      const input = document.getElementById("input").value;
 
-      const body = mode === "text" ? { mode, text: input } : { mode, url: input };
+      const res = await fetch("/api/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          url: mode !== "text" ? input : undefined,
+          text: mode === "text" ? input : undefined
+        }),
+      });
 
-      document.getElementById("result").innerHTML = "⏳ جاري التلخيص...";
-
-      try {
-        const res = await fetch("/api/summarize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (data.summary) {
-          document.getElementById("result").innerHTML = "<b>📌 الملخص:</b><br>" + data.summary;
-        } else {
-          document.getElementById("result").innerHTML = "❌ خطأ: " + (data.error || "غير معروف");
-        }
-      } catch (err) {
-        document.getElementById("result").innerHTML = "⚠️ فشل الاتصال بالسيرفر";
-      }
-    }
+      const data = await res.json();
+      document.getElementById("result").textContent =
+        data.transcript || data.error || "No result";
+    });
   </script>
 </body>
 </html>
